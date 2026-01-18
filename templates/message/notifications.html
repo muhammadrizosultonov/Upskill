@@ -1,0 +1,799 @@
+{% extends 'base.html' %}
+
+{% block title %}Bildirishnomalar - O'quv Markazi{% endblock %}
+
+{% block page_title %}Bildirishnomalar{% endblock %}
+{% block page_subtitle %}Barcha bildirishnomalar va e'lonlar{% endblock %}
+
+{% block content %}
+<!-- Filter Tabs -->
+<div class="notifications-header">
+    <div class="notification-tabs">
+        <button class="notification-tab active" data-filter="all">
+            <i class="fas fa-bell"></i>
+            <span>Barchasi</span>
+            <span class="tab-count">{{ all_count }}</span>
+        </button>
+        <button class="notification-tab" data-filter="unread">
+            <i class="fas fa-envelope"></i>
+            <span>O'qilmaganlar</span>
+            <span class="tab-count">{{ unread_count }}</span>
+        </button>
+        <button class="notification-tab" data-filter="homework">
+            <i class="fas fa-tasks"></i>
+            <span>Vazifalar</span>
+            <span class="tab-count">{{ homework_count }}</span>
+        </button>
+        <button class="notification-tab" data-filter="message">
+            <i class="fas fa-comments"></i>
+            <span>Xabarlar</span>
+            <span class="tab-count">{{ message_count }}</span>
+        </button>
+        <button class="notification-tab" data-filter="announcement">
+            <i class="fas fa-bullhorn"></i>
+            <span>E'lonlar</span>
+            <span class="tab-count">{{ announcement_count }}</span>
+        </button>
+    </div>
+    <div class="notification-actions">
+        <button class="btn btn-secondary" onclick="markAllAsRead()">
+            <i class="fas fa-check-double"></i> Barchasini o'qilgan qilish
+        </button>
+        <button class="btn btn-secondary" onclick="deleteAllRead()">
+            <i class="fas fa-trash"></i> O'qilganlarni o'chirish
+        </button>
+    </div>
+</div>
+
+<!-- Notifications List -->
+<div class="notifications-container">
+    {% for notification in notifications %}
+    <div class="notification-item {% if not notification.is_read %}unread{% endif %}" 
+         data-type="{{ notification.notification_type }}" 
+         data-id="{{ notification.id }}">
+        
+        <!-- Icon -->
+        <div class="notification-icon-wrapper">
+            <div class="notification-icon {{ notification.notification_type }}">
+                {% if notification.notification_type == 'homework' %}
+                    <i class="fas fa-clipboard-list"></i>
+                {% elif notification.notification_type == 'message' %}
+                    <i class="fas fa-envelope"></i>
+                {% elif notification.notification_type == 'grade' %}
+                    <i class="fas fa-star"></i>
+                {% elif notification.notification_type == 'announcement' %}
+                    <i class="fas fa-bullhorn"></i>
+                {% else %}
+                    <i class="fas fa-bell"></i>
+                {% endif %}
+            </div>
+            {% if not notification.is_read %}
+            <div class="unread-indicator"></div>
+            {% endif %}
+        </div>
+
+        <!-- Content -->
+        <div class="notification-content" onclick="openNotification({{ notification.id }})">
+            <div class="notification-header-info">
+                <h3 class="notification-title">{{ notification.title }}</h3>
+                <span class="notification-time">
+                    <i class="fas fa-clock"></i>
+                    {{ notification.created_at|timesince }} oldin
+                </span>
+            </div>
+            <p class="notification-message">{{ notification.message|truncatewords:20 }}</p>
+            
+            <!-- Type Badge -->
+            <div class="notification-meta">
+                <span class="notification-type-badge {{ notification.notification_type }}">
+                    {{ notification.get_notification_type_display }}
+                </span>
+                {% if notification.link %}
+                <a href="{{ notification.link }}" class="notification-link">
+                    Ko'rish <i class="fas fa-arrow-right"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="notification-item-actions">
+            {% if not notification.is_read %}
+            <button class="action-btn" onclick="markAsRead({{ notification.id }})" title="O'qilgan">
+                <i class="fas fa-check"></i>
+            </button>
+            {% endif %}
+            <button class="action-btn" onclick="deleteNotification({{ notification.id }})" title="O'chirish">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="fas fa-bell-slash"></i>
+        </div>
+        <h3>Bildirishnomalar yo'q</h3>
+        <p>Hozircha yangi bildirishnomalar mavjud emas</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if notifications.has_other_pages %}
+<div class="pagination">
+    {% if notifications.has_previous %}
+    <a href="?page={{ notifications.previous_page_number }}" class="pagination-btn">
+        <i class="fas fa-chevron-left"></i>
+    </a>
+    {% else %}
+    <button class="pagination-btn" disabled>
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    {% endif %}
+    
+    {% for num in notifications.paginator.page_range %}
+        {% if notifications.number == num %}
+        <button class="pagination-btn active">{{ num }}</button>
+        {% elif num > notifications.number|add:'-3' and num < notifications.number|add:'3' %}
+        <a href="?page={{ num }}" class="pagination-btn">{{ num }}</a>
+        {% endif %}
+    {% endfor %}
+    
+    {% if notifications.has_next %}
+    <a href="?page={{ notifications.next_page_number }}" class="pagination-btn">
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    {% else %}
+    <button class="pagination-btn" disabled>
+        <i class="fas fa-chevron-right"></i>
+    </button>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Notification Detail Modal -->
+<div class="modal-overlay" id="notificationModal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modalTitle">Bildirishnoma</h2>
+            <button class="modal-close" data-modal-close>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="notification-detail">
+                <div class="detail-icon-wrapper">
+                    <div class="detail-icon" id="modalIcon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                </div>
+                <div class="detail-content">
+                    <div class="detail-meta">
+                        <span class="detail-type" id="modalType"></span>
+                        <span class="detail-time" id="modalTime"></span>
+                    </div>
+                    <h3 id="modalDetailTitle"></h3>
+                    <p id="modalMessage"></p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" data-modal-close>Yopish</button>
+            <button class="btn btn-primary" id="modalActionBtn" style="display: none;">
+                Ko'rish <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Notifications Header */
+.notifications-header {
+    background: var(--dark-card);
+    border: 1px solid var(--dark-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    animation: slideDown 0.5s ease-out;
+    flex-wrap: wrap;
+}
+
+.notification-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.notification-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-weight: 600;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.notification-tab:hover {
+    background: var(--dark-bg);
+    color: var(--text-primary);
+}
+
+.notification-tab.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.notification-tab i {
+    font-size: 1rem;
+}
+
+.tab-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    min-width: 24px;
+    text-align: center;
+}
+
+.notification-tab.active .tab-count {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.notification-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Notifications Container */
+.notifications-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.notification-item {
+    background: var(--dark-card);
+    border: 1px solid var(--dark-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    transition: var(--transition-base);
+    position: relative;
+    overflow: hidden;
+    animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.notification-item:nth-child(1) { animation-delay: 0.05s; }
+.notification-item:nth-child(2) { animation-delay: 0.1s; }
+.notification-item:nth-child(3) { animation-delay: 0.15s; }
+.notification-item:nth-child(4) { animation-delay: 0.2s; }
+.notification-item:nth-child(5) { animation-delay: 0.25s; }
+
+.notification-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: transparent;
+    transition: var(--transition-fast);
+}
+
+.notification-item.unread {
+    background: rgba(99, 102, 241, 0.03);
+    border-color: rgba(99, 102, 241, 0.2);
+}
+
+.notification-item.unread::before {
+    background: var(--primary-color);
+}
+
+.notification-item:hover {
+    transform: translateX(8px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-color);
+}
+
+/* Notification Icon */
+.notification-icon-wrapper {
+    position: relative;
+}
+
+.notification-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    position: relative;
+}
+
+.notification-icon.homework {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.05));
+    color: var(--primary-color);
+}
+
+.notification-icon.message {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05));
+    color: var(--info);
+}
+
+.notification-icon.grade {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05));
+    color: var(--warning);
+}
+
+.notification-icon.announcement {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(236, 72, 153, 0.05));
+    color: var(--accent-color);
+}
+
+.unread-indicator {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    background: var(--danger);
+    border: 3px solid var(--dark-card);
+    border-radius: 50%;
+    animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.8;
+    }
+}
+
+/* Notification Content */
+.notification-content {
+    flex: 1;
+    cursor: pointer;
+    min-width: 0;
+}
+
+.notification-header-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.notification-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.notification-time {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    white-space: nowrap;
+}
+
+.notification-message {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+}
+
+.notification-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.notification-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.notification-type-badge.homework {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary-color);
+}
+
+.notification-type-badge.message {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--info);
+}
+
+.notification-type-badge.grade {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+}
+
+.notification-type-badge.announcement {
+    background: rgba(236, 72, 153, 0.1);
+    color: var(--accent-color);
+}
+
+.notification-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    transition: var(--transition-fast);
+}
+
+.notification-link:hover {
+    color: var(--primary-light);
+    gap: 0.625rem;
+}
+
+/* Notification Actions */
+.notification-item-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--dark-bg);
+    border: 1px solid var(--dark-border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-fast);
+}
+
+.action-btn:hover {
+    background: var(--dark-border);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+}
+
+.action-btn:last-child:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: var(--dark-card);
+    border: 2px dashed var(--dark-border);
+    border-radius: 20px;
+}
+
+.empty-icon {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 1.5rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    color: var(--text-secondary);
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--text-secondary);
+}
+
+/* Notification Detail Modal */
+.notification-detail {
+    text-align: center;
+}
+
+.detail-icon-wrapper {
+    margin-bottom: 1.5rem;
+}
+
+.detail-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+}
+
+.detail-content h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.detail-content p {
+    color: var(--text-secondary);
+    line-height: 1.8;
+    margin-bottom: 1.5rem;
+}
+
+.detail-meta {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.detail-type {
+    padding: 0.5rem 1rem;
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary-color);
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.detail-time {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .notifications-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .notification-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+    
+    .notification-actions {
+        width: 100%;
+    }
+    
+    .notification-actions .btn {
+        flex: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .notification-item {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .notification-icon-wrapper {
+        align-self: flex-start;
+    }
+    
+    .notification-item-actions {
+        align-self: flex-end;
+    }
+    
+    .notification-header-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+</style>
+
+<script>
+// Filter notifications
+document.querySelectorAll('.notification-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        const filter = this.dataset.filter;
+        
+        // Update active tab
+        document.querySelectorAll('.notification-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Filter notifications
+        const items = document.querySelectorAll('.notification-item');
+        items.forEach(item => {
+            if (filter === 'all') {
+                item.style.display = 'flex';
+            } else if (filter === 'unread') {
+                item.style.display = item.classList.contains('unread') ? 'flex' : 'none';
+            } else {
+                item.style.display = item.dataset.type === filter ? 'flex' : 'none';
+            }
+        });
+    });
+});
+
+// Open notification detail
+function openNotification(id) {
+    // Fetch notification details
+    fetch(`/api/notifications/${id}/`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('modalTitle').textContent = 'Bildirishnoma';
+            document.getElementById('modalDetailTitle').textContent = data.title;
+            document.getElementById('modalMessage').textContent = data.message;
+            document.getElementById('modalType').textContent = data.type_display;
+            document.getElementById('modalTime').textContent = data.time;
+            
+            // Update icon
+            const iconElement = document.querySelector('#modalIcon i');
+            iconElement.className = `fas fa-${data.icon}`;
+            
+            // Show action button if link exists
+            const actionBtn = document.getElementById('modalActionBtn');
+            if (data.link) {
+                actionBtn.style.display = 'flex';
+                actionBtn.onclick = () => window.location.href = data.link;
+            } else {
+                actionBtn.style.display = 'none';
+            }
+            
+            openModal('notificationModal');
+            
+            // Mark as read
+            markAsRead(id);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Xatolik yuz berdi!', 'error');
+        });
+}
+
+// Mark as read
+async function markAsRead(id) {
+    try {
+        const response = await fetch(`/api/notifications/${id}/read/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const item = document.querySelector(`[data-id="${id}"]`);
+            item.classList.remove('unread');
+            const unreadIndicator = item.querySelector('.unread-indicator');
+            if (unreadIndicator) unreadIndicator.remove();
+            
+            // Update counters
+            updateCounters();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// Mark all as read
+async function markAllAsRead() {
+    if (!confirm('Barcha bildirishnomalarni o\'qilgan deb belgilaysizmi?')) return;
+    
+    try {
+        const response = await fetch('/api/notifications/mark-all-read/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Barcha bildirishnomalar o\'qilgan!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        }
+    } catch (error) {
+        showNotification('Xatolik yuz berdi!', 'error');
+    }
+}
+
+// Delete notification
+async function deleteNotification(id) {
+    if (!confirm('Rostdan ham bu bildirishnomani o\'chirmoqchimisiz?')) return;
+    
+    try {
+        const response = await fetch(`/api/notifications/${id}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const item = document.querySelector(`[data-id="${id}"]`);
+            item.style.opacity = '0';
+            item.style.transform = 'translateX(-100%)';
+            setTimeout(() => item.remove(), 300);
+            
+            showNotification('Bildirishnoma o\'chirildi!', 'success');
+            updateCounters();
+        }
+    } catch (error) {
+        showNotification('Xatolik yuz berdi!', 'error');
+    }
+}
+
+// Delete all read notifications
+async function deleteAllRead() {
+    if (!confirm('Barcha o\'qilgan bildirishnomalarni o\'chirasizmi?')) return;
+    
+    try {
+        const response = await fetch('/api/notifications/delete-read/', {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('O\'qilgan bildirishnomalar o\'chirildi!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        }
+    } catch (error) {
+        showNotification('Xatolik yuz berdi!', 'error');
+    }
+}
+
+// Update counters
+function updateCounters() {
+    const allCount = document.querySelectorAll('.notification-item').length;
+    const unreadCount = document.querySelectorAll('.notification-item.unread').length;
+    
+    // Update tab counts (would need AJAX to get real counts)
+    document.querySelector('[data-filter="all"] .tab-count').textContent = allCount;
+    document.querySelector('[data-filter="unread"] .tab-count').textContent = unreadCount;
+}
+</script>
+
+{% csrf_token %}
+{% endblock %}

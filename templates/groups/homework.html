@@ -1,0 +1,488 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Vazifalar - O'quv Markazi{% endblock %}
+
+{% block page_title %}Vazifalar{% endblock %}
+{% block page_subtitle %}
+    {% if user.role == 'student' %}
+    Sizning vazifalaringiz
+    {% else %}
+    Barcha vazifalarni boshqaring
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Tabs -->
+<div class="tabs-container mb-3">
+    <div class="tabs">
+        <button class="tab active" data-tab="all">
+            <i class="fas fa-list"></i> Barchasi
+            <span class="tab-badge">{{ all_count }}</span>
+        </button>
+        <button class="tab" data-tab="pending">
+            <i class="fas fa-clock"></i> Bajarilmagan
+            <span class="tab-badge">{{ pending_count }}</span>
+        </button>
+        <button class="tab" data-tab="completed">
+            <i class="fas fa-check-circle"></i> Bajarilgan
+            <span class="tab-badge">{{ completed_count }}</span>
+        </button>
+        {% if user.role in 'teacher,admin' %}
+        <button class="tab" data-tab="grading">
+            <i class="fas fa-star"></i> Baholash
+            <span class="tab-badge">{{ grading_count }}</span>
+        </button>
+        {% endif %}
+    </div>
+    <div class="tabs-actions">
+        {% if user.role in 'teacher,admin' %}
+        <button class="btn btn-primary" data-modal-trigger="createHomeworkModal">
+            <i class="fas fa-plus"></i> Yangi vazifa
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Homework List -->
+<div class="homework-container">
+    {% for homework in homework_list %}
+    <div class="homework-card" data-status="{{ homework.status }}">
+        <div class="homework-card-header">
+            <div class="homework-info">
+                <h3>{{ homework.title }}</h3>
+                <p class="homework-meta">
+                    <span class="meta-item">
+                        <i class="fas fa-users"></i> {{ homework.group.name }}
+                    </span>
+                    <span class="meta-item">
+                        <i class="fas fa-calendar"></i> {{ homework.deadline|date:"d M Y, H:i" }}
+                    </span>
+                    {% if user.role in 'teacher,admin' %}
+                    <span class="meta-item">
+                        <i class="fas fa-paper-plane"></i> {{ homework.submissions.count }}/{{ homework.group.members.count }} topshirdi
+                    </span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="homework-status">
+                {% if homework.is_overdue %}
+                <span class="status-badge danger">
+                    <i class="fas fa-exclamation-circle"></i> Muddati o'tgan
+                </span>
+                {% elif homework.is_submitted %}
+                <span class="status-badge completed">
+                    <i class="fas fa-check-circle"></i> Topshirildi
+                </span>
+                {% else %}
+                <span class="status-badge pending">
+                    <i class="fas fa-clock"></i> Kutilmoqda
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="homework-card-body">
+            <p class="homework-description">{{ homework.description|truncatewords:30 }}</p>
+            
+            {% if homework.file %}
+            <div class="homework-attachment">
+                <i class="fas fa-paperclip"></i>
+                <a href="{{ homework.file.url }}" target="_blank">{{ homework.file.name }}</a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="homework-card-footer">
+            <div class="deadline-info">
+                {% if not homework.is_overdue %}
+                <i class="fas fa-hourglass-half"></i>
+                <span>{{ homework.time_remaining }}</span>
+                {% else %}
+                <i class="fas fa-times-circle"></i>
+                <span>{{ homework.days_overdue }} kun kechikdi</span>
+                {% endif %}
+            </div>
+            <div class="homework-actions">
+                <a href="{% url 'homework_detail' homework.id %}" class="btn btn-primary">
+                    <i class="fas fa-eye"></i> Ko'rish
+                </a>
+                {% if user.role in 'teacher,admin' %}
+                <button class="btn btn-secondary" onclick="editHomework({{ homework.id }})">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-secondary" onclick="deleteHomework({{ homework.id }})">
+                    <i class="fas fa-trash"></i>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Progress Bar (for teachers) -->
+        {% if user.role in 'teacher,admin' %}
+        <div class="homework-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ homework.submission_percentage }}%"></div>
+            </div>
+            <span class="progress-text">{{ homework.submission_percentage }}% topshirdi</span>
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div class="empty-state">
+        <i class="fas fa-clipboard-list"></i>
+        <h3>Vazifalar topilmadi</h3>
+        <p>Hozircha vazifalar mavjud emas</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Create Homework Modal -->
+{% if user.role in 'teacher,admin' %}
+<div class="modal-overlay" id="createHomeworkModal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2 class="modal-title">Yangi vazifa yaratish</h2>
+            <button class="modal-close" data-modal-close>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="createHomeworkForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label">Vazifa nomi *</label>
+                    <input type="text" name="title" class="form-control" required placeholder="Masalan: Python asoslari bo'yicha topshiriq">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Guruh *</label>
+                    <select name="group" class="form-control" required>
+                        <option value="">Tanlang</option>
+                        {% for group in my_groups %}
+                        <option value="{{ group.id }}">{{ group.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Tavsif *</label>
+                    <textarea name="description" class="form-control" rows="5" required placeholder="Vazifa haqida batafsil ma'lumot..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Muddat *</label>
+                    <input type="datetime-local" name="deadline" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Fayl biriktirish</label>
+                    <input type="file" name="file" class="form-control">
+                    <small style="color: var(--text-secondary);">PDF, DOC, DOCX, ZIP formatlarida</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Maksimal ball</label>
+                    <input type="number" name="max_score" class="form-control" value="100" min="1">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" data-modal-close>Bekor qilish</button>
+            <button class="btn btn-primary" onclick="submitHomework()">
+                <i class="fas fa-paper-plane"></i> Yuborish
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+/* Tabs */
+.tabs-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--dark-card);
+    border: 1px solid var(--dark-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    animation: slideDown 0.5s ease-out;
+}
+
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.tab:hover {
+    background: var(--dark-bg);
+    color: var(--text-primary);
+}
+
+.tab.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+}
+
+.tab-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+}
+
+.tab.active .tab-badge {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Homework Cards */
+.homework-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.homework-card {
+    background: var(--dark-card);
+    border: 1px solid var(--dark-border);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: var(--transition-base);
+    animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.homework-card:nth-child(1) { animation-delay: 0.1s; }
+.homework-card:nth-child(2) { animation-delay: 0.15s; }
+.homework-card:nth-child(3) { animation-delay: 0.2s; }
+
+.homework-card:hover {
+    transform: translateX(8px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-color);
+}
+
+.homework-card-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--dark-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.homework-info h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.homework-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.homework-card-body {
+    padding: 1.5rem;
+}
+
+.homework-description {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.homework-attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--dark-bg);
+    border: 1px solid var(--dark-border);
+    border-radius: 10px;
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: var(--transition-fast);
+}
+
+.homework-attachment:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--primary-color);
+}
+
+.homework-card-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--dark-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.deadline-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.homework-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Progress Bar */
+.homework-progress {
+    padding: 1rem 1.5rem;
+    background: var(--dark-bg);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--dark-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 10px;
+    transition: width 0.5s ease;
+}
+
+.progress-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .tabs-container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .tabs {
+        width: 100%;
+        overflow-x: auto;
+    }
+    
+    .homework-card-footer {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .homework-actions {
+        width: 100%;
+    }
+    
+    .homework-actions .btn {
+        flex: 1;
+    }
+}
+</style>
+
+<script>
+// Tab functionality
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        const status = this.dataset.tab;
+        
+        // Update active tab
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Filter homework cards
+        const cards = document.querySelectorAll('.homework-card');
+        cards.forEach(card => {
+            if (status === 'all') {
+                card.style.display = 'block';
+            } else {
+                card.style.display = card.dataset.status === status ? 'block' : 'none';
+            }
+        });
+    });
+});
+
+// Submit homework
+async function submitHomework() {
+    if (!validateForm('createHomeworkForm')) return;
+    
+    const form = document.getElementById('createHomeworkForm');
+    const formData = new FormData(form);
+    
+    try {
+        const response = await fetch('#', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Vazifa muvaffaqiyatli yaratildi!', 'success');
+            closeModal(document.getElementById('createHomeworkModal'));
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.message || 'Xatolik yuz berdi!', 'error');
+        }
+    } catch (error) {
+        showNotification('Xatolik yuz berdi!', 'error');
+    }
+}
+
+function editHomework(id) {
+    window.location.href = `/homework/${id}/edit/`;
+}
+
+function deleteHomework(id) {
+    if (confirm('Rostdan ham bu vazifani o\'chirmoqchimisiz?')) {
+        fetch(`/homework/${id}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Vazifa o\'chirildi!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

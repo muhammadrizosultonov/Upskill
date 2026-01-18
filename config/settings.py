@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -43,6 +44,15 @@ INSTALLED_APPS = [
     'message',
     'dashboard',
 ]
+
+
+JAZZMIN_SETTINGS = {
+    "site_title": "Upskill Admin",
+    "site_header": "Upskill",
+    "show_ui_builder": True,
+}
+
+
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = '/'
@@ -126,6 +136,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'

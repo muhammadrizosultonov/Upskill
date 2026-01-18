@@ -1,0 +1,451 @@
+{% extends 'base.html' %}
+
+{% block title %}Profil - {{ user.get_full_name }}{% endblock %}
+
+{% block page_title %}Profil{% endblock %}
+{% block page_subtitle %}Shaxsiy ma'lumotlaringizni ko'ring va tahrirlang{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <!-- Profile Header Card -->
+    <div class="profile-header-card">
+        <div class="profile-cover" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);"></div>
+        <div class="profile-info-wrapper">
+            <div class="profile-avatar-section">
+                <div class="profile-avatar">
+                    <img src="{{ user.profile_picture.url }}" alt="{{ user.get_full_name }}" 
+                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%236366f1%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E'">
+                    <button class="avatar-edit-btn" data-modal-trigger="editAvatarModal">
+                        <i class="fas fa-camera"></i>
+                    </button>
+                </div>
+                <div class="profile-info">
+                    <h2>{{ user.get_full_name }}</h2>
+                    <p class="profile-role">
+                        <i class="fas fa-#"></i>
+                        {{ user.get_role_display }}
+                    </p>
+                    <div class="profile-meta">
+                        <div class="meta-item">
+                            <i class="fas fa-envelope"></i>
+                            <span>{{ user.email }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-calendar"></i>
+                            <span>Qo'shildi: {{ user.date_joined|date:"d M Y" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-primary" data-modal-trigger="editProfileModal">
+                <i class="fas fa-edit"></i> Profilni tahrirlash
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats & Details -->
+    <div class="profile-content-grid">
+        <!-- Statistics -->
+        <div class="profile-stats-card">
+            <h3><i class="fas fa-chart-bar"></i> Statistika</h3>
+            <div class="stats-list">
+                {% if user.role == 'student' %}
+                <div class="stat-item">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">{{ enrolled_groups }}</div>
+                        <div class="stat-label">Guruhlar</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">{{ completed_homework }}</div>
+                        <div class="stat-label">Bajarilgan vazifalar</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">{{ average_grade }}%</div>
+                        <div class="stat-label">O'rtacha baho</div>
+                    </div>
+                </div>
+                {% elif user.role == 'teacher' %}
+                <div class="stat-item">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">{{ my_groups_count }}</div>
+                        <div class="stat-label">Guruhlar</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon success">
+                        <i class="fas fa-user-graduate"></i>
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">{{ total_students }}</div>
+                        <div class="stat-label">O'quvchilar</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon info">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">{{ active_homework }}</div>
+                        <div class="stat-label">Faol vazifalar</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Personal Information -->
+        <div class="profile-info-card">
+            <h3><i class="fas fa-user"></i> Shaxsiy ma'lumotlar</h3>
+            <div class="info-list">
+                <div class="info-item">
+                    <label>To'liq ism</label>
+                    <span>{{ user.get_full_name }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Email</label>
+                    <span>{{ user.email }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Telefon</label>
+                    <span>{{ user.phone_number|default:"-" }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Manzil</label>
+                    <span>{{ user.address|default:"-" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Timeline -->
+        <div class="profile-activity-card">
+            <h3><i class="fas fa-history"></i> Oxirgi faoliyat</h3>
+            <div class="timeline">
+                {% for activity in recent_activities %}
+                <div class="timeline-item">
+                    <div class="timeline-date">{{ activity.created_at|date:"d M Y, H:i" }}</div>
+                    <div class="timeline-content">
+                        <h4><i class="fas fa-{{ activity.icon }}"></i> {{ activity.title }}</h4>
+                        <p>{{ activity.description }}</p>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-center text-secondary">Faoliyat yo'q</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal-overlay" id="editProfileModal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2 class="modal-title">Profilni tahrirlash</h2>
+            <button class="modal-close" data-modal-close>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="editProfileForm">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label">Ism *</label>
+                    <input type="text" name="first_name" class="form-control" required value="{{ user.first_name }}">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Familiya *</label>
+                    <input type="text" name="last_name" class="form-control" required value="{{ user.last_name }}">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Email *</label>
+                    <input type="email" name="email" class="form-control" required value="{{ user.email }}">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Telefon</label>
+                    <input type="tel" name="phone_number" class="form-control" value="{{ user.phone_number }}">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Manzil</label>
+                    <textarea name="address" class="form-control" rows="3">{{ user.address }}</textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" data-modal-close>Bekor qilish</button>
+            <button class="btn btn-primary" onclick="updateProfile()">
+                <i class="fas fa-save"></i> Saqlash
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Profile Header */
+.profile-header-card {
+    background: var(--dark-card);
+    border: 1px solid var(--dark-border);
+    border-radius: 24px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.profile-cover {
+    height: 200px;
+    position: relative;
+}
+
+.profile-info-wrapper {
+    padding: 0 2rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 2rem;
+}
+
+.profile-avatar-section {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: -80px;
+}
+
+.profile-avatar {
+    position: relative;
+}
+
+.profile-avatar img {
+    width: 160px;
+    height: 160px;
+    border-radius: 24px;
+    border: 6px solid var(--dark-card);
+    object-fit: cover;
+}
+
+.avatar-edit-btn {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: 4px solid var(--dark-card);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-fast);
+}
+
+.avatar-edit-btn:hover {
+    background: var(--primary-dark);
+    transform: scale(1.1);
+}
+
+.profile-info h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.profile-role {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.profile-meta {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.profile-meta .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* Profile Content Grid */
+.profile-content-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.profile-stats-card,
+.profile-info-card,
+.profile-activity-card {
+    background: var(--dark-card);
+    border: 1px solid var(--dark-border);
+    border-radius: 20px;
+    padding: 2rem;
+    animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.profile-stats-card:nth-child(1) { animation-delay: 0.1s; }
+.profile-info-card:nth-child(2) { animation-delay: 0.2s; }
+.profile-activity-card:nth-child(3) { animation-delay: 0.3s; }
+
+.profile-stats-card h3,
+.profile-info-card h3,
+.profile-activity-card h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Stats List */
+.stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: var(--dark-bg);
+    border-radius: 12px;
+    transition: var(--transition-fast);
+}
+
+.stat-item:hover {
+    transform: translateX(8px);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.stat-item .stat-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.stat-details {
+    flex: 1;
+}
+
+.stat-details .stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.stat-details .stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* Info List */
+.info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--dark-border);
+}
+
+.info-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.info-item label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.info-item span {
+    color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+    .profile-info-wrapper {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .profile-avatar-section {
+        flex-direction: column;
+        margin-top: -60px;
+    }
+    
+    .profile-content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+async function updateProfile() {
+    if (!validateForm('editProfileForm')) return;
+    
+    const form = document.getElementById('editProfileForm');
+    const formData = new FormData(form);
+    
+    try {
+        const response = await fetch('#', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Profil muvaffaqiyatli yangilandi!', 'success');
+            closeModal(document.getElementById('editProfileModal'));
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.message || 'Xatolik yuz berdi!', 'error');
+        }
+    } catch (error) {
+        showNotification('Xatolik yuz berdi!', 'error');
+    }
+}
+</script>
+{% endblock %}
