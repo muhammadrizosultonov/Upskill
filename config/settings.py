@@ -54,9 +54,9 @@ JAZZMIN_SETTINGS = {
 
 
 
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = 'login'
+LOGIN_URL = 'users:login'
+LOGIN_REDIRECT_URL = 'dashboard:dashboard'
+LOGOUT_REDIRECT_URL = 'users:login'
 
 
 MIDDLEWARE = [

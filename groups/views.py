@@ -1,13 +1,14 @@
 from django.shortcuts import render
 from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin
 # Create your views here.
 
-class GroupsView(View):
+class GroupsView(LoginRequiredMixin, View):
     def get(self, request):
         return render(request, 'groups/groups.html')
 
 
 
-class HomeworkView(View):
+class HomeworkView(LoginRequiredMixin, View):
     def get(self, request):
         return render(request, 'groups/homework.html')

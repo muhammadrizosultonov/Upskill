@@ -128,10 +128,13 @@
                     <i class="fas fa-cog"></i>
                     <span>Sozlamalar</span>
                 </a>
-                <a href="#" class="nav-link">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Chiqish</span>
-                </a>
+                <form method="POST" action="{% url 'users:logout' %}" class="logout-form">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-link logout-btn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Chiqish</span>
+                    </button>
+                </form>
             </div>
         </nav>
     </aside>
